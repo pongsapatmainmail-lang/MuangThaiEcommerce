@@ -1,0 +1,50 @@
+# ===========================================
+# Shopee Clone - Python Dependencies
+# ===========================================
+
+# Django Core
+Django>=4.2,<5.1
+djangorestframework>=3.14,<3.15
+django-cors-headers>=4.3,<5.0
+django-jazzmin
+
+channels
+
+# Authentication
+djangorestframework-simplejwt>=5.3,<6.0
+
+# Database
+psycopg2-binary>=2.9,<3.0
+
+# Celery & Redis
+celery>=5.3,<6.0
+redis>=5.0,<6.0
+django-celery-beat>=2.5,<3.0
+django-celery-results>=2.5,<3.0
+
+# Image Processing
+Pillow>=10.0,<11.0
+
+# API & Filtering
+django-filter>=23.0,<24.0
+
+# Server
+gunicorn>=21.0,<22.0
+
+# Testing
+pytest>=7.4,<8.0
+pytest-django>=4.7,<5.0
+pytest-cov>=4.1,<5.0
+factory-boy>=3.3,<4.0
+
+# Code Quality
+black>=23.0,<24.0
+isort>=5.13,<6.0
+flake8>=7.0,<8.0
+
+# Utilities
+python-dotenv>=1.0,<2.0
+
+
+
+
