@@ -53,6 +53,7 @@ class OrderListSerializer(serializers.ModelSerializer):
     items_count = serializers.SerializerMethodField()
     items = OrderItemSerializer(many=True, read_only=True)
     buyer_name = serializers.CharField(source='buyer.first_name', read_only=True)
+    total_amount = serializers.SerializerMethodField()
     
     class Meta:
         model = Order
@@ -65,6 +66,9 @@ class OrderListSerializer(serializers.ModelSerializer):
     
     def get_items_count(self, obj):
         return obj.items.count()
+    
+    def get_total_amount(self, obj):
+        return obj.total
 
 
 class OrderDetailSerializer(serializers.ModelSerializer):
@@ -73,7 +77,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     buyer_email = serializers.CharField(source='buyer.email', read_only=True)
     buyer_name = serializers.SerializerMethodField()
-    total_amount = serializers.DecimalField(source='total', max_digits=10, decimal_places=2, read_only=True)
+    total_amount = serializers.SerializerMethodField()
     
     class Meta:
         model = Order
@@ -90,6 +94,9 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         if obj.buyer:
             return f"{obj.buyer.first_name} {obj.buyer.last_name}".strip() or obj.buyer.username
         return ""
+    
+    def get_total_amount(self, obj):
+        return obj.total
 
 
 class CreateOrderSerializer(serializers.Serializer):
