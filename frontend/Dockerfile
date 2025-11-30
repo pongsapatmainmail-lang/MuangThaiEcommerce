@@ -1,20 +1,29 @@
 # ===========================================
-# Shopee Clone - Frontend Dockerfile
+# Dockerfile for Render - Frontend (Next.js)
 # ===========================================
-FROM node:20-alpine
+FROM node:18-alpine
 
-# Set work directory
+# Set working directory
 WORKDIR /app
 
-# Install dependencies
+# Copy package files
 COPY package*.json ./
-RUN npm install
+
+# Install dependencies
+RUN npm ci
 
 # Copy project files
 COPY . .
 
+# Set environment variables
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+# Build the application
+RUN npm run build
+
 # Expose port
 EXPOSE 3000
 
-# Development command
-CMD ["npm", "run", "dev"]
+# Start the application in production mode
+CMD ["npm", "start"]
