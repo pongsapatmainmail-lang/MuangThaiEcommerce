@@ -1,12 +1,11 @@
 /**
  * ===========================================
- * API Configuration - Production Ready
+ * API Configuration - Fixed Version
  * ===========================================
- * วางไฟล์นี้ที่ frontend/src/lib/api.js
  */
 import axios from 'axios';
+import Cookies from 'js-cookie';
 
-// ใช้ environment variable หรือ default
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const api = axios.create({
@@ -20,11 +19,15 @@ const api = axios.create({
 // Request interceptor - เพิ่ม token
 api.interceptors.request.use(
   (config) => {
+    // ลองดึงจาก Cookies ก่อน แล้วค่อย localStorage
+    let token = null;
+    
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+      token = Cookies.get('access_token') || localStorage.getItem('access_token');
+    }
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -36,32 +39,41 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      
+
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
+        const refreshToken = Cookies.get('refresh_token') || localStorage.getItem('refresh_token');
+        
         if (refreshToken) {
           const response = await axios.post(`${API_URL}/api/users/token/refresh/`, {
             refresh: refreshToken,
           });
-          
+
           const { access } = response.data;
-          localStorage.setItem('access_token', access);
           
+          // บันทึก token ใหม่ทั้ง Cookies และ localStorage
+          Cookies.set('access_token', access, { expires: 1 });
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('access_token', access);
+          }
+
           originalRequest.headers.Authorization = `Bearer ${access}`;
           return api(originalRequest);
         }
       } catch (refreshError) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
+        // Refresh failed - clear tokens
+        Cookies.remove('access_token');
+        Cookies.remove('refresh_token');
         if (typeof window !== 'undefined') {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
           window.location.href = '/login';
         }
       }
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -88,10 +100,6 @@ export const productsAPI = {
   update: (id, data) => api.patch(`/products/${id}/`, data),
   delete: (id) => api.delete(`/products/${id}/`),
   getCategories: () => api.get('/products/categories/'),
-  uploadImage: (productId, formData) => 
-    api.post(`/products/${productId}/images/`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
 };
 
 // ===========================================
@@ -99,9 +107,9 @@ export const productsAPI = {
 // ===========================================
 export const cartAPI = {
   get: () => api.get('/cart/'),
-  addItem: (productId, quantity = 1) => 
+  addItem: (productId, quantity = 1) =>
     api.post('/cart/add/', { product_id: productId, quantity }),
-  updateItem: (itemId, quantity) => 
+  updateItem: (itemId, quantity) =>
     api.patch(`/cart/items/${itemId}/`, { quantity }),
   removeItem: (itemId) => api.delete(`/cart/items/${itemId}/`),
   clear: () => api.delete('/cart/clear/'),
@@ -114,13 +122,13 @@ export const ordersAPI = {
   getAll: (params) => api.get('/orders/', { params }),
   getById: (id) => api.get(`/orders/${id}/`),
   create: (data) => api.post('/orders/', data),
-  updateStatus: (id, status) => 
+  updateStatus: (id, status) =>
     api.post(`/orders/${id}/update-status/`, { status }),
-  mockPayment: (id, success = true) => 
+  mockPayment: (id, success = true) =>
     api.post(`/orders/${id}/mock-payment/`, { success }),
-  downloadPDF: (id) => 
+  downloadPDF: (id) =>
     api.get(`/orders/${id}/download-pdf/`, { responseType: 'blob' }),
-  viewPDF: (id) => 
+  viewPDF: (id) =>
     api.get(`/orders/${id}/view-pdf/`, { responseType: 'blob' }),
 };
 
@@ -156,12 +164,10 @@ export const chatAPI = {
       room_type: roomType,
     }),
   getMessages: (roomId) => api.get(`/chat/rooms/${roomId}/messages/`),
-  sendMessage: (roomId, content, messageType = 'text', imageUrl = null, fileUrl = null) =>
+  sendMessage: (roomId, content, messageType = 'text') =>
     api.post(`/chat/rooms/${roomId}/send/`, {
       content,
       message_type: messageType,
-      image_url: imageUrl,
-      file_url: fileUrl,
     }),
   markRead: (roomId) => api.post(`/chat/rooms/${roomId}/mark_read/`),
   getUnreadCount: () => api.get('/chat/rooms/unread_count/'),
