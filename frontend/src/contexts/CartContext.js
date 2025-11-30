@@ -2,7 +2,7 @@
 
 /**
  * ===========================================
- * Cart Context
+ * Cart Context - Fixed Version
  * ===========================================
  * ใช้ localStorage สำหรับ guest และ sync กับ server เมื่อ login
  */
@@ -16,48 +16,77 @@ const CartContext = createContext(null);
 const CART_STORAGE_KEY = 'shopee_cart';
 
 export function CartProvider({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   // โหลด cart จาก localStorage เมื่อเริ่มต้น
   useEffect(() => {
-    const savedCart = localStorage.getItem(CART_STORAGE_KEY);
-    if (savedCart) {
-      try {
-        setItems(JSON.parse(savedCart));
-      } catch (error) {
-        console.error('Failed to parse cart:', error);
+    if (typeof window !== 'undefined') {
+      const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+      if (savedCart) {
+        try {
+          setItems(JSON.parse(savedCart));
+        } catch (error) {
+          console.error('Failed to parse cart:', error);
+        }
       }
+      setInitialized(true);
     }
   }, []);
 
   // บันทึก cart ลง localStorage ทุกครั้งที่เปลี่ยน
   useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-  }, [items]);
+    if (initialized && typeof window !== 'undefined') {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    }
+  }, [items, initialized]);
 
   // Sync กับ server เมื่อ login
   useEffect(() => {
-    if (isAuthenticated && items.length > 0) {
+    if (!authLoading && isAuthenticated && initialized && items.length > 0) {
       syncWithServer();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading, initialized]);
 
   // Sync cart กับ server
   const syncWithServer = async () => {
     try {
-      const cartItems = items.map((item) => ({
-        product_id: item.product.id,
-        quantity: item.quantity,
-      }));
-      const response = await cartAPI.sync(cartItems);
-      // อัพเดท cart จาก server response
-      if (response.data.cart?.items) {
-        setItems(response.data.cart.items);
+      // เพิ่มสินค้าทีละรายการไปยัง server
+      for (const item of items) {
+        try {
+          await cartAPI.addItem(item.product.id, item.quantity);
+        } catch (error) {
+          // ข้ามถ้าเพิ่มไม่ได้ (อาจมีอยู่แล้ว)
+          console.log('Item may already exist in cart:', item.product.id);
+        }
+      }
+      
+      // ดึง cart จาก server
+      const response = await cartAPI.get();
+      if (response.data?.items) {
+        setItems(response.data.items);
       }
     } catch (error) {
       console.error('Failed to sync cart:', error);
+    }
+  };
+
+  // โหลด cart จาก server
+  const loadFromServer = async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      setLoading(true);
+      const response = await cartAPI.get();
+      if (response.data?.items) {
+        setItems(response.data.items);
+      }
+    } catch (error) {
+      console.error('Failed to load cart from server:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -66,7 +95,7 @@ export function CartProvider({ children }) {
     setLoading(true);
     try {
       const existingIndex = items.findIndex(
-        (item) => item.product.id === product.id
+        (item) => item.product?.id === product.id || item.product_id === product.id
       );
 
       if (existingIndex >= 0) {
@@ -81,7 +110,11 @@ export function CartProvider({ children }) {
 
       // Sync กับ server ถ้า login แล้ว
       if (isAuthenticated) {
-        await cartAPI.add(product.id, quantity);
+        try {
+          await cartAPI.addItem(product.id, quantity);
+        } catch (error) {
+          console.error('Failed to add item to server:', error);
+        }
       }
 
       toast.success('เพิ่มสินค้าในตะกร้าแล้ว');
@@ -101,13 +134,17 @@ export function CartProvider({ children }) {
     }
 
     setItems(
-      items.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
-      )
+      items.map((item) => {
+        const itemProductId = item.product?.id || item.product_id;
+        return itemProductId === productId ? { ...item, quantity } : item;
+      })
     );
 
     if (isAuthenticated) {
-      const item = items.find((i) => i.product.id === productId);
+      const item = items.find((i) => {
+        const itemProductId = i.product?.id || i.product_id;
+        return itemProductId === productId;
+      });
       if (item?.id) {
         try {
           await cartAPI.updateItem(item.id, quantity);
@@ -120,8 +157,15 @@ export function CartProvider({ children }) {
 
   // ลบสินค้า
   const removeItem = async (productId) => {
-    const item = items.find((i) => i.product.id === productId);
-    setItems(items.filter((i) => i.product.id !== productId));
+    const item = items.find((i) => {
+      const itemProductId = i.product?.id || i.product_id;
+      return itemProductId === productId;
+    });
+    
+    setItems(items.filter((i) => {
+      const itemProductId = i.product?.id || i.product_id;
+      return itemProductId !== productId;
+    }));
 
     if (isAuthenticated && item?.id) {
       try {
@@ -148,11 +192,11 @@ export function CartProvider({ children }) {
   };
 
   // คำนวณยอดรวม
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = items.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
-    0
-  );
+  const totalItems = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const totalPrice = items.reduce((sum, item) => {
+    const price = item.product?.price || item.price || 0;
+    return sum + price * (item.quantity || 0);
+  }, 0);
 
   const value = {
     items,
@@ -163,7 +207,7 @@ export function CartProvider({ children }) {
     updateQuantity,
     removeItem,
     clearCart,
-    syncWithServer,
+    loadFromServer,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
