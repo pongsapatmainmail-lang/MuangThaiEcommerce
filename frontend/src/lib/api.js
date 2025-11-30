@@ -19,7 +19,6 @@ const api = axios.create({
 // Request interceptor - เพิ่ม token
 api.interceptors.request.use(
   (config) => {
-    // ลองดึงจาก Cookies ก่อน แล้วค่อย localStorage
     let token = null;
     
     if (typeof window !== 'undefined') {
@@ -53,7 +52,6 @@ api.interceptors.response.use(
 
           const { access } = response.data;
           
-          // บันทึก token ใหม่ทั้ง Cookies และ localStorage
           Cookies.set('access_token', access, { expires: 1 });
           if (typeof window !== 'undefined') {
             localStorage.setItem('access_token', access);
@@ -63,7 +61,6 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
       } catch (refreshError) {
-        // Refresh failed - clear tokens
         Cookies.remove('access_token');
         Cookies.remove('refresh_token');
         if (typeof window !== 'undefined') {
@@ -102,9 +99,9 @@ export const productsAPI = {
   delete: (id) => api.delete(`/products/${id}/`),
   getCategories: () => api.get('/products/categories/'),
   
-  // Seller Products
+  // Seller Products - ใช้ my-products endpoint
   getMyProducts: (params) => api.get('/products/my-products/', { params }),
-  getSellerProducts: (sellerId, params) => api.get(`/products/?seller=${sellerId}`, { params }),
+  getSellerProducts: (sellerId, params) => api.get('/products/', { params: { ...params, seller: sellerId } }),
 };
 
 // ===========================================
@@ -136,8 +133,6 @@ export const ordersAPI = {
     api.get(`/orders/${id}/download-pdf/`, { responseType: 'blob' }),
   viewPDF: (id) =>
     api.get(`/orders/${id}/view-pdf/`, { responseType: 'blob' }),
-  
-  // Seller Orders
   getSellerOrders: (params) => api.get('/orders/', { params: { ...params, role: 'seller' } }),
 };
 
@@ -146,7 +141,7 @@ export const ordersAPI = {
 // ===========================================
 export const reviewsAPI = {
   getAll: (params) => api.get('/reviews/', { params }),
-  getByProduct: (productId) => api.get(`/reviews/?product=${productId}`),
+  getByProduct: (productId) => api.get('/reviews/', { params: { product: productId } }),
   create: (data) => api.post('/reviews/', data),
   update: (id, data) => api.patch(`/reviews/${id}/`, data),
   delete: (id) => api.delete(`/reviews/${id}/`),
@@ -157,7 +152,7 @@ export const reviewsAPI = {
 // ===========================================
 export const notificationsAPI = {
   getAll: () => api.get('/notifications/'),
-  getUnread: () => api.get('/notifications/?read=false'),
+  getUnread: () => api.get('/notifications/', { params: { read: false } }),
   markAsRead: (id) => api.post(`/notifications/${id}/read/`),
   markAllAsRead: () => api.post('/notifications/read-all/'),
   getUnreadCount: () => api.get('/notifications/unread-count/'),
@@ -186,11 +181,9 @@ export const chatAPI = {
 };
 
 // ===========================================
-// Seller API (Dashboard)
+// Seller API
 // ===========================================
 export const sellerAPI = {
-  getDashboard: () => api.get('/seller/dashboard/'),
-  getStats: () => api.get('/seller/stats/'),
   getProducts: (params) => api.get('/products/my-products/', { params }),
   getOrders: (params) => api.get('/orders/', { params: { ...params, role: 'seller' } }),
 };
