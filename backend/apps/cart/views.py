@@ -53,6 +53,22 @@ def post(self, request):
     return self.delete(request)
 ```
 
+class ClearCartView(APIView):
+    """
+    DELETE /api/cart/clear/ - ล้างตะกร้าสินค้า
+    POST /api/cart/clear/ - ล้างตะกร้าสินค้า (รองรับ POST ด้วย)
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def delete(self, request):
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        cart.items.all().delete()
+        return Response({'message': 'ล้างตะกร้าสำเร็จ'}, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        return self.delete(request)
+
+
 class SyncCartView(APIView):
 “””
 POST /api/cart/sync/ - Sync ตะกร้าจาก localStorage
