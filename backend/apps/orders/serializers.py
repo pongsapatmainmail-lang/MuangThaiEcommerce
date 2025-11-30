@@ -6,7 +6,6 @@ Orders App - Serializers
 from django.db import transaction
 from rest_framework import serializers
 
-from apps.notifications.tasks import send_order_notification
 from apps.products.models import Product
 
 from .models import Order, OrderItem
@@ -20,14 +19,22 @@ class OrderItemSerializer(serializers.ModelSerializer):
         source='product',
         write_only=True
     )
+    product_name = serializers.CharField(read_only=True)
+    product_image = serializers.SerializerMethodField()
+    price = serializers.DecimalField(source='product_price', max_digits=10, decimal_places=2, read_only=True)
     
     class Meta:
         model = OrderItem
         fields = [
-            'id', 'product_id', 'product', 'product_name',
-            'product_price', 'quantity', 'total', 'seller'
+            'id', 'product_id', 'product', 'product_name', 'product_image',
+            'product_price', 'price', 'quantity', 'total', 'seller'
         ]
         read_only_fields = ['product_name', 'product_price', 'total', 'seller']
+    
+    def get_product_image(self, obj):
+        if obj.product and obj.product.images.exists():
+            return obj.product.images.first().image_url
+        return None
     
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -44,12 +51,16 @@ class OrderListSerializer(serializers.ModelSerializer):
     """Serializer สำหรับ list คำสั่งซื้อ"""
     
     items_count = serializers.SerializerMethodField()
+    items = OrderItemSerializer(many=True, read_only=True)
+    buyer_name = serializers.CharField(source='buyer.first_name', read_only=True)
     
     class Meta:
         model = Order
         fields = [
-            'id', 'order_number', 'status', 'total',
-            'payment_status', 'items_count', 'created_at'
+            'id', 'order_number', 'status', 'total', 'total_amount',
+            'payment_status', 'items_count', 'items', 'buyer_name',
+            'shipping_name', 'shipping_phone', 'shipping_address',
+            'created_at'
         ]
     
     def get_items_count(self, obj):
@@ -61,17 +72,24 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     
     items = OrderItemSerializer(many=True, read_only=True)
     buyer_email = serializers.CharField(source='buyer.email', read_only=True)
+    buyer_name = serializers.SerializerMethodField()
+    total_amount = serializers.DecimalField(source='total', max_digits=10, decimal_places=2, read_only=True)
     
     class Meta:
         model = Order
         fields = [
-            'id', 'order_number', 'buyer', 'buyer_email', 'status',
+            'id', 'order_number', 'buyer', 'buyer_email', 'buyer_name', 'status',
             'shipping_name', 'shipping_phone', 'shipping_address',
             'payment_method', 'payment_status',
-            'subtotal', 'shipping_fee', 'total',
+            'subtotal', 'shipping_fee', 'total', 'total_amount',
             'notes', 'items', 'created_at', 'updated_at'
         ]
         read_only_fields = ['order_number', 'buyer', 'subtotal', 'total']
+    
+    def get_buyer_name(self, obj):
+        if obj.buyer:
+            return f"{obj.buyer.first_name} {obj.buyer.last_name}".strip() or obj.buyer.username
+        return ""
 
 
 class CreateOrderSerializer(serializers.Serializer):
@@ -94,7 +112,8 @@ class CreateOrderSerializer(serializers.Serializer):
         validated_items = []
         
         for item in items:
-            product_id = item.get('product_id')
+            # รองรับหลาย format
+            product_id = item.get('product_id') or item.get('product', {}).get('id')
             quantity = item.get('quantity', 1)
             
             if not product_id:
@@ -155,8 +174,19 @@ class CreateOrderSerializer(serializers.Serializer):
         # คำนวณยอดรวม
         order.calculate_totals()
         
-        # ส่ง notification (Celery task)
-        send_order_notification.delay(order.id)
+        # ส่ง notification แบบ sync (ไม่ใช้ Celery)
+        try:
+            from apps.notifications.models import Notification
+            Notification.objects.create(
+                user=user,
+                type='order',
+                title='สั่งซื้อสำเร็จ',
+                message=f'คำสั่งซื้อ {order.order_number} ถูกสร้างเรียบร้อยแล้ว',
+                data={'order_id': order.id}
+            )
+        except Exception as e:
+            # ถ้าสร้าง notification ไม่ได้ก็ไม่เป็นไร
+            print(f"Failed to create notification: {e}")
         
         return order
 
