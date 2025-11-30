@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { useChat } from '@/contexts/ChatContext';
 import { useState } from 'react';
-import { FiShoppingCart, FiUser, FiMenu, FiX, FiSearch, FiMessageCircle } from 'react-icons/fi';
+import { FiShoppingCart, FiUser, FiMenu, FiX, FiSearch, FiMessageCircle, FiPackage } from 'react-icons/fi';
 
 export default function Navbar() {
   const { user, isAuthenticated, isSeller, logout } = useAuth();
@@ -43,6 +43,9 @@ export default function Navbar() {
               <>
                 <Link href="/notifications" className="hover:text-primary-100">
                   แจ้งเตือน
+                </Link>
+                <Link href="/orders" className="hover:text-primary-100">
+                  คำสั่งซื้อของฉัน
                 </Link>
                 <Link href="/profile" className="hover:text-primary-100">
                   <span className="flex items-center">
@@ -107,6 +110,13 @@ export default function Navbar() {
               </Link>
             )}
 
+            {/* Orders - แสดงเฉพาะเมื่อ login */}
+            {isAuthenticated && (
+              <Link href="/orders" className="relative p-2 hover:bg-primary-600 rounded-lg" title="คำสั่งซื้อของฉัน">
+                <FiPackage className="text-2xl" />
+              </Link>
+            )}
+
             {/* Cart */}
             <Link href="/cart" className="relative p-2 hover:bg-primary-600 rounded-lg">
               <FiShoppingCart className="text-2xl" />
@@ -140,11 +150,11 @@ export default function Navbar() {
                 💬 แชท {unreadCount > 0 && `(${unreadCount})`}
               </Link>
               <Link href="/orders" className="block py-2">
-                คำสั่งซื้อ
+                📦 คำสั่งซื้อของฉัน
               </Link>
               {isSeller && (
                 <Link href="/seller" className="block py-2">
-                  จัดการร้านค้า
+                  🏪 จัดการร้านค้า
                 </Link>
               )}
             </>
