@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
@@ -234,11 +234,11 @@ export default function MyOrdersPage() {
                       <div className="flex-1">
                         <p className="text-gray-900 font-medium">{item.product_name}</p>
                         <p className="text-gray-500 text-sm">
-                          ฿{parseFloat(item.price).toLocaleString()} x {item.quantity}
+                          ฿{parseFloat(item.price || item.product_price).toLocaleString()} x {item.quantity}
                         </p>
                       </div>
                       <p className="font-medium text-gray-900">
-                        ฿{(item.price * item.quantity).toLocaleString()}
+                        ฿{((item.price || item.product_price) * item.quantity).toLocaleString()}
                       </p>
                     </div>
                   ))}
@@ -249,7 +249,7 @@ export default function MyOrdersPage() {
                   <div className="text-right">
                     <span className="text-gray-600">ยอดรวม: </span>
                     <span className="text-xl font-bold text-orange-500">
-                      ฿{parseFloat(order.total_amount || 0).toLocaleString()}
+                      ฿{parseFloat(order.total_amount || order.total || 0).toLocaleString()}
                     </span>
                   </div>
 
