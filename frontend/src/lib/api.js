@@ -96,10 +96,15 @@ export const authAPI = {
 export const productsAPI = {
   getAll: (params) => api.get('/products/', { params }),
   getById: (id) => api.get(`/products/${id}/`),
+  getBySlug: (slug) => api.get(`/products/slug/${slug}/`),
   create: (data) => api.post('/products/', data),
   update: (id, data) => api.patch(`/products/${id}/`, data),
   delete: (id) => api.delete(`/products/${id}/`),
   getCategories: () => api.get('/products/categories/'),
+  
+  // Seller Products
+  getMyProducts: (params) => api.get('/products/my-products/', { params }),
+  getSellerProducts: (sellerId, params) => api.get(`/products/?seller=${sellerId}`, { params }),
 };
 
 // ===========================================
@@ -110,9 +115,10 @@ export const cartAPI = {
   addItem: (productId, quantity = 1) =>
     api.post('/cart/add/', { product_id: productId, quantity }),
   updateItem: (itemId, quantity) =>
-    api.patch(`/cart/items/${itemId}/`, { quantity }),
+    api.put(`/cart/items/${itemId}/`, { quantity }),
   removeItem: (itemId) => api.delete(`/cart/items/${itemId}/`),
   clear: () => api.delete('/cart/clear/'),
+  sync: (items) => api.post('/cart/sync/', { items }),
 };
 
 // ===========================================
@@ -130,12 +136,16 @@ export const ordersAPI = {
     api.get(`/orders/${id}/download-pdf/`, { responseType: 'blob' }),
   viewPDF: (id) =>
     api.get(`/orders/${id}/view-pdf/`, { responseType: 'blob' }),
+  
+  // Seller Orders
+  getSellerOrders: (params) => api.get('/orders/', { params: { ...params, role: 'seller' } }),
 };
 
 // ===========================================
 // Reviews API
 // ===========================================
 export const reviewsAPI = {
+  getAll: (params) => api.get('/reviews/', { params }),
   getByProduct: (productId) => api.get(`/reviews/?product=${productId}`),
   create: (data) => api.post('/reviews/', data),
   update: (id, data) => api.patch(`/reviews/${id}/`, data),
@@ -147,8 +157,10 @@ export const reviewsAPI = {
 // ===========================================
 export const notificationsAPI = {
   getAll: () => api.get('/notifications/'),
+  getUnread: () => api.get('/notifications/?read=false'),
   markAsRead: (id) => api.post(`/notifications/${id}/read/`),
   markAllAsRead: () => api.post('/notifications/read-all/'),
+  getUnreadCount: () => api.get('/notifications/unread-count/'),
 };
 
 // ===========================================
@@ -171,6 +183,16 @@ export const chatAPI = {
     }),
   markRead: (roomId) => api.post(`/chat/rooms/${roomId}/mark_read/`),
   getUnreadCount: () => api.get('/chat/rooms/unread_count/'),
+};
+
+// ===========================================
+// Seller API (Dashboard)
+// ===========================================
+export const sellerAPI = {
+  getDashboard: () => api.get('/seller/dashboard/'),
+  getStats: () => api.get('/seller/stats/'),
+  getProducts: (params) => api.get('/products/my-products/', { params }),
+  getOrders: (params) => api.get('/orders/', { params: { ...params, role: 'seller' } }),
 };
 
 export default api;
