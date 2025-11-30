@@ -52,7 +52,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # เพิ่ม WhiteNoise
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -147,7 +147,16 @@ USE_TZ = True
 # ===========================================
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# ใช้ WhiteNoise แบบไม่ต้อง manifest (แก้ปัญหา Jazzmin)
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -229,21 +238,16 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_TASK_TIME_LIMIT = 30 * 60
 CELERY_RESULT_EXTENDED = True
 
 # ===========================================
-# Email Settings (Mock for Development)
+# Email Settings
 # ===========================================
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND', 
     'django.core.mail.backends.console.EmailBackend'
 )
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 25))
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'False').lower() in ('true', '1', 'yes')
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 
 # ===========================================
 # Logging
@@ -251,37 +255,14 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'simple',
         },
     },
     'root': {
         'handlers': ['console'],
         'level': 'INFO',
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
-            'propagate': False,
-        },
-        'celery': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
     },
 }
 
@@ -295,61 +276,32 @@ JAZZMIN_SETTINGS = {
     "welcome_sign": "ยินดีต้อนรับสู่ระบบจัดการ MuangThai",
     "site_logo": None,
     "login_logo": None,
-    "site_icon": "fas fa-shopping-cart",
+    "site_icon": None,
     "copyright": "MuangThai E-commerce",
     "user_avatar": None,
     "topmenu_links": [
         {"name": "หน้าหลัก", "url": "admin:index", "permissions": ["auth.view_user"]},
-        {"model": "auth.User"},
     ],
     "show_sidebar": True,
     "navigation_expanded": True,
-    "hide_apps": [],
-    "hide_models": [],
     "icons": {
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
         "auth.Group": "fas fa-users",
         "products.Category": "fas fa-tags",
         "products.Product": "fas fa-box",
-        "products.ProductImage": "fas fa-images",
         "orders.Order": "fas fa-shopping-bag",
-        "orders.OrderItem": "fas fa-list",
         "cart.Cart": "fas fa-shopping-cart",
-        "cart.CartItem": "fas fa-cart-plus",
         "reviews.Review": "fas fa-star",
         "notifications.Notification": "fas fa-bell",
         "users.User": "fas fa-user-circle",
-        "chat.ChatRoom": "fas fa-comments",
-        "chat.Message": "fas fa-comment",
     },
     "default_icon_parents": "fas fa-folder",
     "default_icon_children": "fas fa-circle",
     "related_modal_active": False,
-    "custom_css": None,
-    "custom_js": None,
     "use_google_fonts_cdn": True,
-    "show_ui_builder": False,
     "changeform_format": "horizontal_tabs",
-    "changeform_format_overrides": {
-        "auth.user": "collapsible",
-        "auth.group": "vertical_tabs",
-    },
 }
-
-# ===========================================
-# Channels Configuration (Optional)
-# ===========================================
-if os.environ.get('REDIS_URL'):
-    ASGI_APPLICATION = 'config.asgi.application'
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                'hosts': [os.environ.get('REDIS_URL')],
-            },
-        },
-    }
 
 # ===========================================
 # Jazzmin UI Tweaks
@@ -394,3 +346,6 @@ if os.environ.get('RENDER'):
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    
+    # CSRF trusted origins
+    CSRF_TRUSTED_ORIGINS = ['https://*.onrender.com']
