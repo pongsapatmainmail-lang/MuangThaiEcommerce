@@ -1,43 +1,37 @@
 # ===========================================
-# Shopee Clone - Backend Dockerfile
+# Dockerfile for Render - Backend
 # ===========================================
-# Base image: Python 3.11 slim
 FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE=config.settings
 
 # Set work directory
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+RUN apt-get update && apt-get install -y \
+    gcc \
     libpq-dev \
-    libjpeg-dev \
-    zlib1g-dev \
-    libpng-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy project files
+# Copy project
 COPY . .
 
-# Create directories for media and static files
-RUN mkdir -p /app/media /app/staticfiles
+# Create staticfiles directory
+RUN mkdir -p /app/staticfiles
 
-# Create non-root user for security
-RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
-USER appuser
+# Collect static files (with dummy SECRET_KEY for build)
+RUN SECRET_KEY=build-secret-key python manage.py collectstatic --noinput --clear
 
 # Expose port
-EXPOSE 8000
+EXPOSE 10000
 
-# Default command
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
+# Start command - migrate then run gunicorn
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-10000}"]

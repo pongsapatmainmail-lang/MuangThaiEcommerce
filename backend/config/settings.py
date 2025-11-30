@@ -143,20 +143,18 @@ USE_I18N = True
 USE_TZ = True
 
 # ===========================================
-# Static & Media Files
+# Static & Media Files - แก้ไขสำหรับ WhiteNoise + Jazzmin
 # ===========================================
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# ใช้ WhiteNoise แบบไม่ต้อง manifest (แก้ปัญหา Jazzmin)
-STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
-    },
-}
+# WhiteNoise Configuration
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_MANIFEST_STRICT = False
+WHITENOISE_ALLOW_ALL_ORIGINS = True
+
+# ใช้ WhiteNoise storage แบบไม่ต้อง manifest
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
