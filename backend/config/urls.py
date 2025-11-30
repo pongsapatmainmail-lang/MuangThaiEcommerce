@@ -13,8 +13,9 @@ urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
     
-    # API Endpoints
+    # API Endpoints - รองรับทั้ง /api/auth/ และ /api/users/
     path('api/auth/', include('apps.users.urls')),
+    path('api/users/', include('apps.users.urls')),  # เพิ่มบรรทัดนี้
     path('api/products/', include('apps.products.urls')),
     path('api/cart/', include('apps.cart.urls')),
     path('api/orders/', include('apps.orders.urls')),
@@ -24,6 +25,7 @@ urlpatterns = [
     
     # JWT Token Refresh
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/users/token/refresh/', TokenRefreshView.as_view(), name='token_refresh_users'),  # เพิ่มบรรทัดนี้
 ]
 
 # Serve media files in development
