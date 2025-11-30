@@ -17,7 +17,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key-change-this-i
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.onrender.com').split(',')
 
 # ===========================================
 # Application Definition
@@ -47,13 +47,12 @@ INSTALLED_APPS = [
     'apps.cart',
     'apps.reviews',
     'apps.notifications',
-    ##'seed',
-    'channels',
     'chat',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # เพิ่ม WhiteNoise
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -84,18 +83,33 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # ===========================================
-# Database
+# Database - รองรับทั้ง Docker และ Render
 # ===========================================
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'shopee_db'),
-        'USER': os.environ.get('POSTGRES_USER', 'shopee_user'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'shopee_password_123'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'db'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+import dj_database_url
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    # Production (Render) - ใช้ DATABASE_URL
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    # Development (Docker) - ใช้ค่าเดิม
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'shopee_db'),
+            'USER': os.environ.get('POSTGRES_USER', 'shopee_user'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'shopee_password_123'),
+            'HOST': os.environ.get('POSTGRES_HOST', 'db'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        }
+    }
 
 # ===========================================
 # Custom User Model
@@ -133,6 +147,7 @@ USE_TZ = True
 # ===========================================
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -143,7 +158,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ===========================================
-# X-Frame-Options (แก้ไข iframe error)
+# X-Frame-Options
 # ===========================================
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
@@ -206,8 +221,9 @@ CORS_ALLOW_CREDENTIALS = True
 # ===========================================
 # Celery Settings
 # ===========================================
-CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', REDIS_URL)
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', REDIS_URL)
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -273,39 +289,23 @@ LOGGING = {
 # Jazzmin Admin Settings
 # ===========================================
 JAZZMIN_SETTINGS = {
-    # ชื่อเว็บ
     "site_title": "MuangThai Admin",
     "site_header": "MuangThai",
     "site_brand": "MuangThai Shop",
     "welcome_sign": "ยินดีต้อนรับสู่ระบบจัดการ MuangThai",
-    
-    # Logo
     "site_logo": None,
     "login_logo": None,
-    
-    # ไอคอน (ใช้ Font Awesome)
     "site_icon": "fas fa-shopping-cart",
-    
-    # Copyright
     "copyright": "MuangThai E-commerce",
-    
-    # User Avatar
     "user_avatar": None,
-    
-    # Top Menu
     "topmenu_links": [
         {"name": "หน้าหลัก", "url": "admin:index", "permissions": ["auth.view_user"]},
-        {"name": "ดูเว็บไซต์", "url": "http://localhost:3000", "new_window": True},
         {"model": "auth.User"},
     ],
-    
-    # Side Menu
     "show_sidebar": True,
     "navigation_expanded": True,
     "hide_apps": [],
     "hide_models": [],
-    
-    # Icons สำหรับแต่ละ App
     "icons": {
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
@@ -323,19 +323,13 @@ JAZZMIN_SETTINGS = {
         "chat.ChatRoom": "fas fa-comments",
         "chat.Message": "fas fa-comment",
     },
-    
-    # Default Icon
     "default_icon_parents": "fas fa-folder",
     "default_icon_children": "fas fa-circle",
-    
-    # UI Tweaks
-    "related_modal_active": False,  # ปิด modal popup
+    "related_modal_active": False,
     "custom_css": None,
     "custom_js": None,
     "use_google_fonts_cdn": True,
     "show_ui_builder": False,
-    
-    # Change view
     "changeform_format": "horizontal_tabs",
     "changeform_format_overrides": {
         "auth.user": "collapsible",
@@ -344,17 +338,18 @@ JAZZMIN_SETTINGS = {
 }
 
 # ===========================================
-# Channels Configuration
+# Channels Configuration (Optional)
 # ===========================================
-ASGI_APPLICATION = 'config.asgi.application'
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [('redis', 6379)],
+if os.environ.get('REDIS_URL'):
+    ASGI_APPLICATION = 'config.asgi.application'
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [os.environ.get('REDIS_URL')],
+            },
         },
-    },
-}
+    }
 
 # ===========================================
 # Jazzmin UI Tweaks
@@ -390,3 +385,12 @@ JAZZMIN_UI_TWEAKS = {
         "success": "btn-success"
     }
 }
+
+# ===========================================
+# Production Security (Render)
+# ===========================================
+if os.environ.get('RENDER'):
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
