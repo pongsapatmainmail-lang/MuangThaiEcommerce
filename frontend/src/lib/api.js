@@ -1,65 +1,67 @@
 /**
  * ===========================================
- * API Client Library
+ * API Configuration - Production Ready
  * ===========================================
+ * วางไฟล์นี้ที่ frontend/src/lib/api.js
  */
 import axios from 'axios';
-import Cookies from 'js-cookie';
 
-// สร้าง axios instance
+// ใช้ environment variable หรือ default
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
+  baseURL: `${API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
-// Request interceptor - เพิ่ม token ในทุก request
+// Request interceptor - เพิ่ม token
 api.interceptors.request.use(
   (config) => {
-    const token = Cookies.get('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor - จัดการ token หมดอายุ
+// Response interceptor - จัดการ token expired
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-
-    // ถ้า 401 และยังไม่ได้ retry
+    
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
+      
       try {
-        const refreshToken = Cookies.get('refresh_token');
+        const refreshToken = localStorage.getItem('refresh_token');
         if (refreshToken) {
-          const response = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/auth/token/refresh/`,
-            { refresh: refreshToken }
-          );
-
+          const response = await axios.post(`${API_URL}/api/users/token/refresh/`, {
+            refresh: refreshToken,
+          });
+          
           const { access } = response.data;
-          Cookies.set('access_token', access);
-
+          localStorage.setItem('access_token', access);
+          
           originalRequest.headers.Authorization = `Bearer ${access}`;
           return api(originalRequest);
         }
       } catch (refreshError) {
-        // Refresh token หมดอายุ - logout
-        Cookies.remove('access_token');
-        Cookies.remove('refresh_token');
-        window.location.href = '/login';
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
       }
     }
-
+    
     return Promise.reject(error);
   }
 );
@@ -68,13 +70,12 @@ api.interceptors.response.use(
 // Auth API
 // ===========================================
 export const authAPI = {
-  register: (data) => api.post('/auth/register/', data),
-  login: (data) => api.post('/auth/login/', data),
-  logout: (refreshToken) => api.post('/auth/logout/', { refresh: refreshToken }),
-  getProfile: () => api.get('/auth/profile/'),
-  updateProfile: (data) => api.patch('/auth/profile/', data),
-  changePassword: (data) => api.post('/auth/change-password/', data),
-  becomeSeller: (data) => api.post('/auth/become-seller/', data),
+  register: (data) => api.post('/users/register/', data),
+  login: (data) => api.post('/users/login/', data),
+  logout: (refresh) => api.post('/users/logout/', { refresh }),
+  getProfile: () => api.get('/users/profile/'),
+  updateProfile: (data) => api.patch('/users/profile/', data),
+  refreshToken: (refresh) => api.post('/users/token/refresh/', { refresh }),
 };
 
 // ===========================================
@@ -83,23 +84,14 @@ export const authAPI = {
 export const productsAPI = {
   getAll: (params) => api.get('/products/', { params }),
   getById: (id) => api.get(`/products/${id}/`),
-  create: (data) => {
-    const formData = new FormData();
-    Object.keys(data).forEach((key) => {
-      if (key === 'images' && Array.isArray(data[key])) {
-        data[key].forEach((file) => formData.append('images', file));
-      } else {
-        formData.append(key, data[key]);
-      }
-    });
-    return api.post('/products/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
+  create: (data) => api.post('/products/', data),
   update: (id, data) => api.patch(`/products/${id}/`, data),
   delete: (id) => api.delete(`/products/${id}/`),
-  getMyProducts: () => api.get('/products/my-products/'),
   getCategories: () => api.get('/products/categories/'),
+  uploadImage: (productId, formData) => 
+    api.post(`/products/${productId}/images/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 // ===========================================
@@ -107,13 +99,12 @@ export const productsAPI = {
 // ===========================================
 export const cartAPI = {
   get: () => api.get('/cart/'),
-  sync: (items) => api.post('/cart/sync/', { items }),
-  add: (productId, quantity = 1) =>
+  addItem: (productId, quantity = 1) => 
     api.post('/cart/add/', { product_id: productId, quantity }),
-  updateItem: (itemId, quantity) =>
-    api.put(`/cart/items/${itemId}/`, { quantity }),
+  updateItem: (itemId, quantity) => 
+    api.patch(`/cart/items/${itemId}/`, { quantity }),
   removeItem: (itemId) => api.delete(`/cart/items/${itemId}/`),
-  clear: () => api.delete('/cart/'),
+  clear: () => api.delete('/cart/clear/'),
 };
 
 // ===========================================
@@ -123,18 +114,23 @@ export const ordersAPI = {
   getAll: (params) => api.get('/orders/', { params }),
   getById: (id) => api.get(`/orders/${id}/`),
   create: (data) => api.post('/orders/', data),
-  updateStatus: (id, status) =>
+  updateStatus: (id, status) => 
     api.post(`/orders/${id}/update-status/`, { status }),
-  mockPayment: (id, success = true) =>
+  mockPayment: (id, success = true) => 
     api.post(`/orders/${id}/mock-payment/`, { success }),
+  downloadPDF: (id) => 
+    api.get(`/orders/${id}/download-pdf/`, { responseType: 'blob' }),
+  viewPDF: (id) => 
+    api.get(`/orders/${id}/view-pdf/`, { responseType: 'blob' }),
 };
 
 // ===========================================
 // Reviews API
 // ===========================================
 export const reviewsAPI = {
-  getByProduct: (productId) => api.get('/reviews/', { params: { product: productId } }),
+  getByProduct: (productId) => api.get(`/reviews/?product=${productId}`),
   create: (data) => api.post('/reviews/', data),
+  update: (id, data) => api.patch(`/reviews/${id}/`, data),
   delete: (id) => api.delete(`/reviews/${id}/`),
 };
 
@@ -143,9 +139,32 @@ export const reviewsAPI = {
 // ===========================================
 export const notificationsAPI = {
   getAll: () => api.get('/notifications/'),
-  markRead: (id) => api.post(`/notifications/${id}/mark-read/`),
-  markAllRead: () => api.post('/notifications/mark-all-read/'),
-  getUnreadCount: () => api.get('/notifications/unread-count/'),
+  markAsRead: (id) => api.post(`/notifications/${id}/read/`),
+  markAllAsRead: () => api.post('/notifications/read-all/'),
+};
+
+// ===========================================
+// Chat API
+// ===========================================
+export const chatAPI = {
+  getRooms: () => api.get('/chat/rooms/'),
+  getRoom: (id) => api.get(`/chat/rooms/${id}/`),
+  createOrGetRoom: (participantId, productId, roomType = 'buyer_seller') =>
+    api.post('/chat/rooms/create_or_get/', {
+      participant_id: participantId,
+      product_id: productId,
+      room_type: roomType,
+    }),
+  getMessages: (roomId) => api.get(`/chat/rooms/${roomId}/messages/`),
+  sendMessage: (roomId, content, messageType = 'text', imageUrl = null, fileUrl = null) =>
+    api.post(`/chat/rooms/${roomId}/send/`, {
+      content,
+      message_type: messageType,
+      image_url: imageUrl,
+      file_url: fileUrl,
+    }),
+  markRead: (roomId) => api.post(`/chat/rooms/${roomId}/mark_read/`),
+  getUnreadCount: () => api.get('/chat/rooms/unread_count/'),
 };
 
 export default api;

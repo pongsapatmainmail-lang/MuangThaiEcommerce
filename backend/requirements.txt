@@ -1,50 +1,40 @@
 # ===========================================
-# Shopee Clone - Python Dependencies
+# Python Dependencies for Production
 # ===========================================
 
-# Django Core
-Django>=4.2,<5.1
-djangorestframework>=3.14,<3.15
-django-cors-headers>=4.3,<5.0
-django-jazzmin
-
-channels
+# Django
+Django>=4.2,<5.0
+djangorestframework>=3.14,<4.0
+django-cors-headers>=4.2,<5.0
+django-filter>=23.2,<24.0
 
 # Authentication
 djangorestframework-simplejwt>=5.3,<6.0
 
 # Database
 psycopg2-binary>=2.9,<3.0
+dj-database-url>=2.1,<3.0
 
-# Celery & Redis
+# Production Server
+gunicorn>=21.2,<22.0
+whitenoise>=6.5,<7.0
+
+# Celery (Optional)
 celery>=5.3,<6.0
-redis>=5.0,<6.0
 django-celery-beat>=2.5,<3.0
 django-celery-results>=2.5,<3.0
+redis>=4.6,<5.0
 
-# Image Processing
+# PDF Generation
+reportlab>=4.0,<5.0
+
+# Admin Theme
+django-jazzmin>=2.6,<3.0
+
+# Utils
+python-dotenv>=1.0,<2.0
 Pillow>=10.0,<11.0
 
-# API & Filtering
-django-filter>=23.0,<24.0
-
-# Server
-gunicorn>=21.0,<22.0
-
-# Testing
-pytest>=7.4,<8.0
-pytest-django>=4.7,<5.0
-pytest-cov>=4.1,<5.0
-factory-boy>=3.3,<4.0
-
-# Code Quality
-black>=23.0,<24.0
-isort>=5.13,<6.0
-flake8>=7.0,<8.0
-
-# Utilities
-python-dotenv>=1.0,<2.0
-
-
-
-
+# Channels (WebSocket)
+channels>=4.0,<5.0
+channels-redis>=4.1,<5.0

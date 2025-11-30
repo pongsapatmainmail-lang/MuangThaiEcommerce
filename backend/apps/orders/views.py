@@ -40,6 +40,12 @@ class OrderViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = Order.objects.all()
         
+        # Admin เห็นทุก Order
+        if user.is_staff:
+            role = self.request.query_params.get('role', 'all')
+            if role == 'all':
+                return queryset.prefetch_related('items', 'items__product')
+        
         # Filter ตาม role
         role = self.request.query_params.get('role', 'buyer')
         
@@ -55,7 +61,36 @@ class OrderViewSet(viewsets.ModelViewSet):
         if status_filter:
             queryset = queryset.filter(status=status_filter)
         
-        return queryset.prefetch_related('items')
+        return queryset.prefetch_related('items', 'items__product')
+    
+    def get_object(self):
+        """
+        Override get_object เพื่อให้ Admin, Seller, Buyer เข้าถึง Order ได้
+        """
+        pk = self.kwargs.get('pk')
+        user = self.request.user
+        
+        try:
+            order = Order.objects.prefetch_related('items', 'items__product').get(pk=pk)
+        except Order.DoesNotExist:
+            from rest_framework.exceptions import NotFound
+            raise NotFound('ไม่พบคำสั่งซื้อ')
+        
+        # Admin เข้าถึงได้ทุก Order
+        if user.is_staff:
+            return order
+        
+        # Buyer เข้าถึงได้เฉพาะ Order ของตัวเอง
+        if order.buyer == user:
+            return order
+        
+        # Seller เข้าถึงได้ถ้ามีสินค้าของตัวเองใน Order
+        if user.is_seller and order.items.filter(seller=user).exists():
+            return order
+        
+        # ไม่มีสิทธิ์
+        from rest_framework.exceptions import PermissionDenied
+        raise PermissionDenied('คุณไม่มีสิทธิ์เข้าถึงคำสั่งซื้อนี้')
     
     def create(self, request, *args, **kwargs):
         """สร้างคำสั่งซื้อ (Checkout)"""
@@ -73,18 +108,19 @@ class OrderViewSet(viewsets.ModelViewSet):
         """อัพเดทสถานะคำสั่งซื้อ (สำหรับ Seller)"""
         order = self.get_object()
         
-        # ตรวจสอบสิทธิ์: ต้องเป็น seller ที่มีสินค้าใน order
-        if not request.user.is_seller:
-            return Response(
-                {'error': 'คุณไม่มีสิทธิ์'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        if not order.items.filter(seller=request.user).exists():
-            return Response(
-                {'error': 'คุณไม่ใช่ผู้ขายสินค้าในคำสั่งซื้อนี้'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # ตรวจสอบสิทธิ์: ต้องเป็น seller ที่มีสินค้าใน order หรือ admin
+        if not request.user.is_staff:
+            if not request.user.is_seller:
+                return Response(
+                    {'error': 'คุณไม่มีสิทธิ์'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            if not order.items.filter(seller=request.user).exists():
+                return Response(
+                    {'error': 'คุณไม่ใช่ผู้ขายสินค้าในคำสั่งซื้อนี้'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
         
         serializer = UpdateOrderStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -102,8 +138,8 @@ class OrderViewSet(viewsets.ModelViewSet):
         """Mock payment สำหรับทดสอบ"""
         order = self.get_object()
         
-        # ตรวจสอบสิทธิ์: ต้องเป็นผู้ซื้อ
-        if order.buyer != request.user:
+        # ตรวจสอบสิทธิ์: ต้องเป็นผู้ซื้อ หรือ admin
+        if order.buyer != request.user and not request.user.is_staff:
             return Response(
                 {'error': 'คุณไม่ใช่เจ้าของคำสั่งซื้อนี้'},
                 status=status.HTTP_403_FORBIDDEN
@@ -134,18 +170,6 @@ class OrderViewSet(viewsets.ModelViewSet):
         try:
             order = self.get_object()
             
-            # ตรวจสอบสิทธิ์ (ต้องเป็นผู้ซื้อ หรือ seller ของสินค้า หรือ admin)
-            user = request.user
-            is_buyer = order.buyer == user
-            is_seller = order.items.filter(seller=user).exists()
-            is_admin = user.is_staff
-            
-            if not (is_buyer or is_seller or is_admin):
-                return Response(
-                    {'error': 'คุณไม่มีสิทธิ์ดาวน์โหลดคำสั่งซื้อนี้'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
             # สร้าง PDF
             pdf_buffer = generate_order_pdf(order)
             
@@ -166,18 +190,6 @@ class OrderViewSet(viewsets.ModelViewSet):
         """ดู PDF ใน browser (ไม่ดาวน์โหลด)"""
         try:
             order = self.get_object()
-            
-            # ตรวจสอบสิทธิ์
-            user = request.user
-            is_buyer = order.buyer == user
-            is_seller = order.items.filter(seller=user).exists()
-            is_admin = user.is_staff
-            
-            if not (is_buyer or is_seller or is_admin):
-                return Response(
-                    {'error': 'คุณไม่มีสิทธิ์ดูคำสั่งซื้อนี้'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
             
             # สร้าง PDF
             pdf_buffer = generate_order_pdf(order)
