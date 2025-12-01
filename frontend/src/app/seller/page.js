@@ -55,15 +55,27 @@ export default function SellerDashboard() {
     }).format(price);
   };
 
+  const getStatusLabel = (status) => {
+    const labels = {
+      pending: 'รอดำเนินการ',
+      confirmed: 'ยืนยันแล้ว',
+      paid: 'ชำระเงินแล้ว',
+      shipped: 'จัดส่งแล้ว',
+      delivered: 'ส่งถึงแล้ว',
+      cancelled: 'ยกเลิก',
+    };
+    return labels[status] || status;
+  };
+
   if (!isAuthenticated || !isSeller) {
     return null;
   }
 
   const totalRevenue = orders
     .filter((o) => o.payment_status)
-    .reduce((sum, o) => sum + parseFloat(o.total || 0), 0);
+    .reduce((sum, o) => sum + parseFloat(o.total || o.total_amount || 0), 0);
 
-  const pendingOrders = orders.filter((o) => o.status === 'paid').length;
+  const pendingOrders = orders.filter((o) => o.status === 'paid' || o.status === 'pending').length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -83,7 +95,7 @@ export default function SellerDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg p-6">
+        <Link href="/seller/products" className="bg-white rounded-lg p-6 hover:shadow-lg transition">
           <div className="flex items-center">
             <div className="p-3 bg-blue-100 rounded-lg">
               <FiPackage className="text-2xl text-blue-500" />
@@ -93,9 +105,9 @@ export default function SellerDashboard() {
               <p className="text-2xl font-bold">{products.length}</p>
             </div>
           </div>
-        </div>
+        </Link>
 
-        <div className="bg-white rounded-lg p-6">
+        <Link href="/seller/orders" className="bg-white rounded-lg p-6 hover:shadow-lg transition">
           <div className="flex items-center">
             <div className="p-3 bg-yellow-100 rounded-lg">
               <FiShoppingBag className="text-2xl text-yellow-500" />
@@ -105,7 +117,7 @@ export default function SellerDashboard() {
               <p className="text-2xl font-bold">{pendingOrders}</p>
             </div>
           </div>
-        </div>
+        </Link>
 
         <div className="bg-white rounded-lg p-6">
           <div className="flex items-center">
@@ -124,7 +136,7 @@ export default function SellerDashboard() {
       <div className="bg-white rounded-lg p-6 mb-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">คำสั่งซื้อล่าสุด</h2>
-          <Link href="/orders" className="text-primary-500 hover:underline">
+          <Link href="/seller/orders" className="text-primary-500 hover:underline">
             ดูทั้งหมด
           </Link>
         </div>
@@ -147,11 +159,14 @@ export default function SellerDashboard() {
                 <div>
                   <p className="font-medium">#{order.order_number}</p>
                   <p className="text-sm text-gray-500">
+                    {order.shipping_name || order.buyer_name}
+                  </p>
+                  <p className="text-xs text-gray-400">
                     {new Date(order.created_at).toLocaleDateString('th-TH')}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold">{formatPrice(order.total)}</p>
+                  <p className="font-bold">{formatPrice(order.total || order.total_amount)}</p>
                   <span
                     className={`text-xs px-2 py-1 rounded ${
                       order.status === 'pending'
@@ -160,10 +175,12 @@ export default function SellerDashboard() {
                         ? 'bg-blue-100 text-blue-800'
                         : order.status === 'shipped'
                         ? 'bg-purple-100 text-purple-800'
-                        : 'bg-green-100 text-green-800'
+                        : order.status === 'delivered'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
                     }`}
                   >
-                    {order.status}
+                    {getStatusLabel(order.status)}
                   </span>
                 </div>
               </div>
@@ -200,13 +217,17 @@ export default function SellerDashboard() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {products.slice(0, 8).map((product) => (
-              <div key={product.id} className="border rounded-lg p-4">
+              <Link 
+                key={product.id} 
+                href={`/seller/products/${product.id}/edit`}
+                className="border rounded-lg p-4 hover:shadow-md transition"
+              >
                 <p className="font-medium truncate">{product.name}</p>
                 <p className="text-primary-500 font-bold">
                   {formatPrice(product.price)}
                 </p>
                 <p className="text-sm text-gray-500">สต็อก: {product.stock}</p>
-              </div>
+              </Link>
             ))}
           </div>
         )}

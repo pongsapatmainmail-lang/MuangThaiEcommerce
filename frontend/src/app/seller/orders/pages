@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import api from '@/lib/api';
 
 export default function SellerOrdersPage() {
@@ -15,7 +14,6 @@ export default function SellerOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [downloadingId, setDownloadingId] = useState(null);
 
-  // สถานะคำสั่งซื้อ
   const statusOptions = [
     { value: '', label: 'ทั้งหมด' },
     { value: 'pending', label: 'รอดำเนินการ' },
@@ -50,7 +48,6 @@ export default function SellerOrdersPage() {
     return labels[status] || status;
   };
 
-  // ดึงข้อมูล Orders
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
@@ -85,7 +82,6 @@ export default function SellerOrdersPage() {
     }
   };
 
-  // ดาวน์โหลด PDF
   const handleDownloadPDF = async (orderId) => {
     try {
       setDownloadingId(orderId);
@@ -93,7 +89,6 @@ export default function SellerOrdersPage() {
         responseType: 'blob',
       });
 
-      // สร้าง blob URL และดาวน์โหลด
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -111,7 +106,6 @@ export default function SellerOrdersPage() {
     }
   };
 
-  // ดู PDF ใน browser
   const handleViewPDF = async (orderId) => {
     try {
       setDownloadingId(orderId);
@@ -130,13 +124,12 @@ export default function SellerOrdersPage() {
     }
   };
 
-  // อัพเดทสถานะ
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
       await api.post(`/orders/${orderId}/update-status/`, {
         status: newStatus,
       });
-      fetchOrders(); // รีโหลดข้อมูล
+      fetchOrders();
     } catch (err) {
       console.error('Error updating status:', err);
       alert('ไม่สามารถอัพเดทสถานะได้');
@@ -275,7 +268,7 @@ export default function SellerOrdersPage() {
                             </div>
                           </div>
                           <p className="font-medium text-gray-900">
-                            ฿{(item.price * item.quantity).toLocaleString()}
+                            ฿{((item.price || item.product_price) * item.quantity).toLocaleString()}
                           </p>
                         </div>
                       ))}
@@ -287,7 +280,7 @@ export default function SellerOrdersPage() {
                     <div className="text-right">
                       <p className="text-gray-500">ยอดรวมทั้งหมด</p>
                       <p className="text-2xl font-bold text-orange-500">
-                        ฿{parseFloat(order.total_amount || 0).toLocaleString()}
+                        ฿{parseFloat(order.total_amount || order.total || 0).toLocaleString()}
                       </p>
                     </div>
                   </div>
