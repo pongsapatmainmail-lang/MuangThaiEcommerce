@@ -1,12 +1,10 @@
-'use client';
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 
 export default function SellerOrdersPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isSeller } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,20 +47,18 @@ export default function SellerOrdersPage() {
   };
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-      return;
-    }
-
-    if (!authLoading && user && !user.is_seller) {
-      router.push('/');
-      return;
-    }
-
-    if (user && user.is_seller) {
+    if (!authLoading) {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+      if (!isSeller) {
+        router.push('/');
+        return;
+      }
       fetchOrders();
     }
-  }, [user, authLoading, statusFilter]);
+  }, [user, authLoading, isSeller, statusFilter]);
 
   const fetchOrders = async () => {
     try {
@@ -147,13 +143,11 @@ export default function SellerOrdersPage() {
   return (
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">คำสั่งซื้อของร้าน</h1>
           <p className="text-gray-600 mt-1">จัดการคำสั่งซื้อและดาวน์โหลดใบสั่งซื้อ</p>
         </div>
 
-        {/* Filter */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
           <div className="flex flex-wrap items-center gap-4">
             <label className="text-gray-700 font-medium">กรองสถานะ:</label>
@@ -177,28 +171,16 @@ export default function SellerOrdersPage() {
           </div>
         </div>
 
-        {/* Error */}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
             {error}
           </div>
         )}
 
-        {/* Orders List */}
         {orders.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-8 text-center">
-            <svg
-              className="mx-auto h-16 w-16 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
+            <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
             <h3 className="mt-4 text-lg font-medium text-gray-900">ไม่มีคำสั่งซื้อ</h3>
             <p className="mt-2 text-gray-500">ยังไม่มีคำสั่งซื้อสินค้าของคุณ</p>
@@ -207,37 +189,22 @@ export default function SellerOrdersPage() {
           <div className="space-y-4">
             {orders.map((order) => (
               <div key={order.id} className="bg-white rounded-lg shadow overflow-hidden">
-                {/* Order Header */}
                 <div className="bg-gray-50 px-6 py-4 border-b flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <span className="text-gray-600">หมายเลขคำสั่งซื้อ: </span>
-                    <span className="font-semibold text-gray-900">
-                      {order.order_number || `#${order.id}`}
-                    </span>
+                    <span className="font-semibold text-gray-900">{order.order_number || `#${order.id}`}</span>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                        order.status
-                      )}`}
-                    >
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
                       {getStatusLabel(order.status)}
                     </span>
                     <span className="text-gray-500 text-sm">
-                      {new Date(order.created_at).toLocaleDateString('th-TH', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {new Date(order.created_at).toLocaleDateString('th-TH')}
                     </span>
                   </div>
                 </div>
 
-                {/* Order Content */}
                 <div className="px-6 py-4">
-                  {/* Buyer Info */}
                   <div className="mb-4">
                     <h4 className="text-sm font-medium text-gray-500 mb-2">ข้อมูลผู้ซื้อ</h4>
                     <p className="text-gray-900">{order.shipping_name || order.buyer_name}</p>
@@ -245,37 +212,26 @@ export default function SellerOrdersPage() {
                     <p className="text-gray-600 text-sm">{order.shipping_address}</p>
                   </div>
 
-                  {/* Order Items */}
                   <div className="mb-4">
                     <h4 className="text-sm font-medium text-gray-500 mb-2">รายการสินค้า</h4>
-                    <div className="space-y-2">
-                      {order.items?.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
-                        >
-                          <div className="flex items-center gap-3">
-                            {item.product_image && (
-                              <img
-                                src={item.product_image}
-                                alt={item.product_name}
-                                className="w-12 h-12 object-cover rounded"
-                              />
-                            )}
-                            <div>
-                              <p className="text-gray-900">{item.product_name}</p>
-                              <p className="text-gray-500 text-sm">x{item.quantity}</p>
-                            </div>
+                    {order.items?.map((item, index) => (
+                      <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                        <div className="flex items-center gap-3">
+                          {item.product_image && (
+                            <img src={item.product_image} alt={item.product_name} className="w-12 h-12 object-cover rounded" />
+                          )}
+                          <div>
+                            <p className="text-gray-900">{item.product_name}</p>
+                            <p className="text-gray-500 text-sm">x{item.quantity}</p>
                           </div>
-                          <p className="font-medium text-gray-900">
-                            ฿{((item.price || item.product_price) * item.quantity).toLocaleString()}
-                          </p>
                         </div>
-                      ))}
-                    </div>
+                        <p className="font-medium text-gray-900">
+                          ฿{((item.price || item.product_price) * item.quantity).toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
                   </div>
 
-                  {/* Total */}
                   <div className="flex justify-end border-t pt-4">
                     <div className="text-right">
                       <p className="text-gray-500">ยอดรวมทั้งหมด</p>
@@ -286,9 +242,7 @@ export default function SellerOrdersPage() {
                   </div>
                 </div>
 
-                {/* Order Actions */}
                 <div className="bg-gray-50 px-6 py-4 border-t flex flex-wrap items-center justify-between gap-4">
-                  {/* Status Update */}
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-600">เปลี่ยนสถานะ:</label>
                     <select
@@ -305,74 +259,19 @@ export default function SellerOrdersPage() {
                     </select>
                   </div>
 
-                  {/* PDF Actions */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleViewPDF(order.id)}
                       disabled={downloadingId === order.id}
-                      className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
                     >
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </svg>
                       ดู PDF
                     </button>
                     <button
                       onClick={() => handleDownloadPDF(order.id)}
                       disabled={downloadingId === order.id}
-                      className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition disabled:opacity-50"
                     >
-                      {downloadingId === order.id ? (
-                        <svg
-                          className="animate-spin w-5 h-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                      ) : (
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
-                      )}
                       ดาวน์โหลด PDF
                     </button>
                   </div>
@@ -385,3 +284,4 @@ export default function SellerOrdersPage() {
     </div>
   );
 }
+ENDOFFILE
